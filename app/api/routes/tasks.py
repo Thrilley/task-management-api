@@ -3,8 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.task import Task
-from app.schemas.task import TaskCreate, TaskRead
+from app.models.task import Task, TaskStatus
+from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -19,8 +19,14 @@ async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)) -
 
 
 @router.get("", response_model=list[TaskRead])
-async def list_tasks(db: AsyncSession = Depends(get_db)) -> list[Task]:
-    return list((await db.scalars(select(Task).order_by(Task.created_at.desc()))).all())
+async def list_tasks(
+    status: TaskStatus | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[Task]:
+    query = select(Task).order_by(Task.created_at.desc())
+    if status is not None:
+        query = query.where(Task.status == status)
+    return list((await db.scalars(query)).all())
 
 
 @router.get("/{task_id}", response_model=TaskRead)
@@ -29,3 +35,27 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_db)) -> Task:
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@router.patch("/{task_id}", response_model=TaskRead)
+async def update_task(
+    task_id: int, payload: TaskUpdate, db: AsyncSession = Depends(get_db)
+) -> Task:
+    task = await db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(task, field, value)
+    await db.commit()
+    await db.refresh(task)
+    return task
+
+
+@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)) -> None:
+    task = await db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    await db.delete(task)
+    await db.commit()
