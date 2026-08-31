@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,14 +23,16 @@ async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)) -
 @router.get("", response_model=list[TaskRead])
 async def list_tasks(
     status: TaskStatus | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ) -> list[Task]:
-    cache_key = f"tasks:list:{status.value if status else 'all'}"
+    cache_key = f"tasks:list:{status.value if status else 'all'}:{limit}:{offset}"
     cached_tasks = await get_task_list(cache_key)
     if cached_tasks is not None:
         return [TaskRead.model_validate(task) for task in cached_tasks]
 
-    query = select(Task).order_by(Task.created_at.desc())
+    query = select(Task).order_by(Task.created_at.desc()).limit(limit).offset(offset)
     if status is not None:
         query = query.where(Task.status == status)
     tasks = list((await db.scalars(query)).all())

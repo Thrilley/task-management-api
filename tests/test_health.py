@@ -14,3 +14,9 @@ def test_healthcheck() -> None:
 def test_task_update_keeps_only_supplied_fields() -> None:
     payload = TaskUpdate(status=TaskStatus.done)
     assert payload.model_dump(exclude_unset=True) == {"status": TaskStatus.done}
+
+
+def test_list_tasks_documents_pagination_parameters() -> None:
+    parameters = app.openapi()["paths"]["/api/v1/tasks"]["get"]["parameters"]
+    parameter_names = {parameter["name"] for parameter in parameters}
+    assert {"limit", "offset", "status"}.issubset(parameter_names)
