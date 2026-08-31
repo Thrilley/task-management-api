@@ -1,67 +1,109 @@
-# Task Management API
+# 👋 Hi, I'm Evgeny
 
-Учебно-практический REST API для управления задачами. Проект демонстрирует слоистую backend-архитектуру, асинхронный доступ к PostgreSQL и контейнерный запуск.
+### 🐍 Python Backend Developer
 
-## Стек
+I'm a Python developer focused on **backend development, REST APIs and automation**.
 
-- **FastAPI** — HTTP-слой, валидация запросов и OpenAPI-документация.
-- **PostgreSQL** — постоянное хранение данных.
-- **SQLAlchemy 2.0 (async)** — ORM и безопасная работа с БД.
-- **Alembic** — версионирование схемы БД; первая миграция создаёт таблицу `tasks`.
-- **Redis** — кэш списка задач на 60 секунд. Кэш очищается после создания, изменения или удаления задачи.
-- **Docker Compose** — одинаковое окружение для разработки.
-- **pytest** — автоматическая проверка API.
+I started programming out of personal interest and gradually moved from small Python applications to backend development. Currently, I'm building projects with modern Python technologies and developing my understanding of backend architecture, databases and API design.
 
-## Аутентификация
+---
 
-1. Создайте пользователя через `POST /api/v1/auth/register` с email и паролем не короче 8 символов.
-2. Получите JWT через `POST /api/v1/auth/login`: поле `username` — это email, `password` — пароль.
-3. В Swagger нажмите **Authorize** и вставьте полученный `access_token`. После этого endpoints задач доступны только владельцу токена.
+## 🚀 What I work with
 
-Пароли не хранятся в открытом виде: используется Argon2-хеширование через `pwdlib`. JWT действует 30 минут в локальной конфигурации; перед развёртыванием значение `JWT_SECRET` нужно заменить в `.env`.
+### Backend
+- Python
+- FastAPI
+- REST API
+- Pydantic
+- AsyncIO
+- Telegram Bot API
 
-## Запуск
+### Databases
+- PostgreSQL
+- SQLite
+- SQLAlchemy
+- Alembic
+- SQL
 
-1. Установите Docker Desktop и запустите его.
-2. Скопируйте `.env.example` в `.env` и замените пароль PostgreSQL.
-3. Выполните `docker compose up --build`.
-4. Откройте `http://localhost:8000/docs`.
+### Tools & Infrastructure
+- Git
+- GitHub
+- Docker
+- Linux
+- Postman
+- Swagger / OpenAPI
 
-## Первые endpoints
+### Testing
+- Pytest
+- Unit testing
+- API testing
 
-| Метод | URL | Назначение |
-| --- | --- | --- |
-| GET | `/health` | Проверка, что API отвечает |
-| POST | `/api/v1/auth/register` | Зарегистрировать пользователя |
-| POST | `/api/v1/auth/login` | Получить JWT-токен |
-| POST | `/api/v1/tasks` | Создать задачу |
-| GET | `/api/v1/tasks` | Получить список задач |
-| GET | `/api/v1/tasks/{task_id}` | Получить задачу |
-| PATCH | `/api/v1/tasks/{task_id}` | Частично обновить задачу |
-| DELETE | `/api/v1/tasks/{task_id}` | Удалить задачу |
+---
 
-Список можно фильтровать по статусу: `/api/v1/tasks?status=todo`. Пагинация
-использует `limit` (от 1 до 100, по умолчанию 20) и `offset`: например,
-`/api/v1/tasks?limit=20&offset=40` вернёт третью страницу.
+## 📌 Featured Projects
 
-Пример тела запроса для создания задачи:
+### 🔹 Task Management API
+Backend service for managing users, tasks and permissions.
 
-```json
-{"title": "Подготовить README", "description": "Добавить запуск и описание архитектуры"}
+**Stack:** Python · FastAPI · PostgreSQL · SQLAlchemy · Alembic · Redis · Docker · Pytest
+
+> In development
+
+### 🔹 Telegram Bot Backend
+Backend-oriented Telegram bot with API integration and persistent data storage.
+
+**Stack:** Python · FastAPI · PostgreSQL · Redis · Docker
+
+> In development
+
+### 🔹 Expense Tracker
+Application for tracking personal expenses and working with structured data.
+
+**Stack:** Python · SQLite
+
+---
+
+## 🎯 Current Focus
+
+I'm currently focusing on:
+
+- Backend architecture
+- REST API design
+- PostgreSQL and SQL
+- Asynchronous Python
+- Authentication and authorization
+- Docker and application deployment
+- Automated testing
+- Writing clean and maintainable code
+
+My long-term goal is to become a strong **Python Backend Engineer** and work with production systems and scalable services.
+
+---
+
+## 📈 Learning by Building
+
+I believe the best way to learn backend development is to build real projects.
+
+Instead of focusing only on theory, I try to understand how individual technologies work together:
+
+```text
+Client
+   ↓
+REST API
+   ↓
+FastAPI
+   ↓
+Business Logic
+   ↓
+SQLAlchemy
+   ↓
+PostgreSQL
 ```
 
-## Как объяснить решение на собеседовании
+As my projects become more advanced, I'm gradually adding caching, background tasks, containers, testing and CI/CD.
 
-**Почему API versioning?** Префикс `/api/v1` позволяет развивать контракт без внезапной поломки клиентов.
+---
 
-**Почему async SQLAlchemy?** Асинхронный драйвер не блокирует event loop во время ожидания PostgreSQL; это полезно при множестве одновременных запросов, но не ускоряет CPU-bound операции.
+## 📫 Contact
 
-**Почему Docker Compose?** Он фиксирует сервисы и их настройки: любой разработчик получает те же PostgreSQL и Redis без ручной установки.
-
-**Почему PATCH, а не PUT?** PATCH передаёт только изменяемые поля. Это предотвращает случайное затирание значений, которые клиент не собирался менять.
-
-**Почему кэш нужно инвалидировать?** Без очистки Redis мог бы вернуть устаревший список после изменения данных в PostgreSQL. Поэтому любая операция записи удаляет кэшированные списки; следующий GET наполняет кэш заново.
-
-**Зачем нужна пагинация?** Количество задач не ограничено. `limit` ограничивает размер ответа, а `offset` задаёт позицию, с которой начинается выборка; так API не загружает в память все записи сразу.
-
-**Как защищены задачи разных пользователей?** JWT содержит идентификатор пользователя. Сервер проверяет подпись токена и добавляет условие `task.user_id == current_user.id` к каждому запросу задач. Поэтому один пользователь не может прочитать или изменить задачу другого.
+GitHub: [@Thrilley](https://github.com/Thrilley)
