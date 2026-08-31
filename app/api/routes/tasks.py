@@ -3,16 +3,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import get_task_list, invalidate_task_list_cache, set_task_list
+from app.api.dependencies.auth import get_current_user
 from app.db.session import get_db
 from app.models.task import Task, TaskStatus
+from app.models.user import User
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 @router.post("", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
-async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)) -> Task:
-    task = Task(**payload.model_dump())
+async def create_task(
+    payload: TaskCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Task:
+    task = Task(**payload.model_dump(), user_id=current_user.id)
     db.add(task)
     await db.commit()
     await db.refresh(task)
@@ -26,13 +32,14 @@ async def list_tasks(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[Task]:
-    cache_key = f"tasks:list:{status.value if status else 'all'}:{limit}:{offset}"
+    cache_key = f"tasks:list:{current_user.id}:{status.value if status else 'all'}:{limit}:{offset}"
     cached_tasks = await get_task_list(cache_key)
     if cached_tasks is not None:
         return [TaskRead.model_validate(task) for task in cached_tasks]
 
-    query = select(Task).order_by(Task.created_at.desc()).limit(limit).offset(offset)
+    query = select(Task).where(Task.user_id == current_user.id).order_by(Task.created_at.desc())
     if status is not None:
         query = query.where(Task.status == status)
     tasks = list((await db.scalars(query)).all())
@@ -42,8 +49,10 @@ async def list_tasks(
 
 
 @router.get("/{task_id}", response_model=TaskRead)
-async def get_task(task_id: int, db: AsyncSession = Depends(get_db)) -> Task:
-    task = await db.get(Task, task_id)
+async def get_task(
+    task_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+) -> Task:
+    task = await db.scalar(select(Task).where(Task.id == task_id, Task.user_id == current_user.id))
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
@@ -51,9 +60,12 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_db)) -> Task:
 
 @router.patch("/{task_id}", response_model=TaskRead)
 async def update_task(
-    task_id: int, payload: TaskUpdate, db: AsyncSession = Depends(get_db)
+    task_id: int,
+    payload: TaskUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Task:
-    task = await db.get(Task, task_id)
+    task = await db.scalar(select(Task).where(Task.id == task_id, Task.user_id == current_user.id))
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -66,8 +78,10 @@ async def update_task(
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)) -> None:
-    task = await db.get(Task, task_id)
+async def delete_task(
+    task_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+) -> None:
+    task = await db.scalar(select(Task).where(Task.id == task_id, Task.user_id == current_user.id))
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     await db.delete(task)

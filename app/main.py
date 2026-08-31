@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.routes.auth import router as auth_router
 from app.api.routes.tasks import router as tasks_router
 from app.core.cache import close_cache_connection
 
@@ -13,6 +14,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Task Management API", version="0.1.0", lifespan=lifespan)
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 
 

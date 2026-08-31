@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import settings
 from app.db.base import Base
 from app.models.task import Task  # noqa: F401 - registers table metadata
+from app.models.user import User  # noqa: F401 - registers table metadata
 
 config = context.config
 if config.config_file_name is not None:
