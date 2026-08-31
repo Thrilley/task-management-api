@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import get_task_list, invalidate_task_list_cache, set_task_list
 from app.db.session import get_db
 from app.models.task import Task, TaskStatus
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
@@ -15,6 +16,7 @@ async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)) -
     db.add(task)
     await db.commit()
     await db.refresh(task)
+    await invalidate_task_list_cache()
     return task
 
 
@@ -23,10 +25,18 @@ async def list_tasks(
     status: TaskStatus | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[Task]:
+    cache_key = f"tasks:list:{status.value if status else 'all'}"
+    cached_tasks = await get_task_list(cache_key)
+    if cached_tasks is not None:
+        return [TaskRead.model_validate(task) for task in cached_tasks]
+
     query = select(Task).order_by(Task.created_at.desc())
     if status is not None:
         query = query.where(Task.status == status)
-    return list((await db.scalars(query)).all())
+    tasks = list((await db.scalars(query)).all())
+    cache_payload = [TaskRead.model_validate(task).model_dump(mode="json") for task in tasks]
+    await set_task_list(cache_key, cache_payload)
+    return tasks
 
 
 @router.get("/{task_id}", response_model=TaskRead)
@@ -49,6 +59,7 @@ async def update_task(
         setattr(task, field, value)
     await db.commit()
     await db.refresh(task)
+    await invalidate_task_list_cache()
     return task
 
 
@@ -59,3 +70,4 @@ async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)) -> None:
         raise HTTPException(status_code=404, detail="Task not found")
     await db.delete(task)
     await db.commit()
+    await invalidate_task_list_cache()
